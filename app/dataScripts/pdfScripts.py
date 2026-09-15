@@ -94,7 +94,6 @@ def extractPDF() -> None:
                         "slug": slug,
                         "source": filename,
                         "page": i,
-                        "heading": None,
                         "order": i,
                         "title": None,
                         "text": text

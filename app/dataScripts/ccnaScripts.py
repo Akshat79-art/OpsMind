@@ -7,7 +7,7 @@ Usage:
     pip install requests
     python ccnaScripts.py
 
-Files are saved into <repo_root>/data/rawData/ccna_notes/
+Files are saved into OpsMind/data/rawData/networking/<slug>/<file>
 """
 
 from pathlib import Path
@@ -16,7 +16,7 @@ import requests
 
 RAW_BASE = "https://raw.githubusercontent.com/psaumur/CCNA_Course_Notes/main/Course_Notes/"
 REPO_ROOT = Path(__file__).resolve().parents[2]
-OUTPUT_DIR = REPO_ROOT / "data" / "rawData" / "ccna_notes"
+OUTPUT_ROOT = REPO_ROOT / "data" / "rawData" / "networking"
 
 # Curated list: networking fundamentals + automation/cloud topics
 # most relevant to a DevOps beginner (skips deep switching/routing-
@@ -50,12 +50,15 @@ FILES = [
 
 
 def fetch_file(filename: str, session: requests.Session) -> None:
-    url = RAW_BASE + filename
-    dest_path = OUTPUT_DIR / filename
+    slug = Path(filename).stem
+    dest_dir = OUTPUT_ROOT / slug
+    dest_path = dest_dir / filename
 
+    url = RAW_BASE + filename
     resp = session.get(url, timeout=15)
     if resp.status_code == 200:
         resp.encoding = "utf-8"
+        dest_dir.mkdir(parents=True, exist_ok=True)
         dest_path.write_text(resp.text, encoding="utf-8")
         print(f"[OK]      {filename}")
     else:
@@ -63,13 +66,25 @@ def fetch_file(filename: str, session: requests.Session) -> None:
 
 
 def main() -> None:
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    with requests.Session() as session:
-        for filename in FILES:
-            fetch_file(filename, session)
+    failed = 0
+    fetched = 0
+    OUTPUT_ROOT.mkdir(parents=True, exist_ok=True)
 
-    print(f"\nDone. Files saved to: {OUTPUT_DIR}")
+    try:
+        with requests.Session() as session:
+            for filename in FILES:
+                try:
+                    fetch_file(filename, session)
+                    fetched += 1
+                except Exception as e:
+                    failed += 1
+                    print(f"Exception occured: {e}")
+    except Exception as e:
+        print(f"Exception occured: {e}")
+    finally:
+        print(f"Process completed. Files fetched succesfully: {fetched}. Files failed to be fetched: {failed}")
+    
 
 
 if __name__ == "__main__":
