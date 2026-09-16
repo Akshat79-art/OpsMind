@@ -1,12 +1,12 @@
 # OpsMind
 
-A Retrieval-Augmented Generation (RAG) assistant for asking natural-language questions about Linux, networking, and DevOps fundamentals — and getting answers grounded in real reference documentation instead of guesswork.
+A Retrieval-Augmented Generation (RAG) assistant for asking natural-language questions about Linux, networking, and DevOps fundamentals - and getting answers grounded in real reference documentation instead of guesswork.
 
 ## Overview
 
 OpsMind builds a retrieval pipeline over a curated corpus of open documentation. Documents are parsed into a uniform record format, chunked, embedded, and stored in a vector database. Questions are answered by retrieving the most relevant chunks and passing them to an LLM with a grounded prompt, so responses stay anchored to source material.
 
-The project is intentionally built in stages: from a minimal Q&A pipeline toward evaluation, re-ranking, multi-turn conversation, and containerized deployment — mirroring a progression from AI engineering fundamentals into DevOps practice.
+The project is intentionally built in stages: from a minimal Q&A pipeline toward evaluation, re-ranking, multi-turn conversation, and containerized deployment: mirroring a progression in both AI engineering fundamentals and DevOps practice.
 
 ## Status
 
@@ -49,7 +49,8 @@ Every stage writes to its own directory so any stage can be re-run without repea
 OpsMind/
 ├── app/
 │   └── dataScripts/
-│       └── pdfScripts.py        # raw PDFs -> extractedData/<category>/<slug>/records.jsonl
+│       |── pdfScripts.py        # raw PDFs -> extractedData/<category>/<slug>/records.jsonl
+│       └── mdScripts.py
 ├── data/                        # not committed (see .gitignore)
 │   ├── rawData/<category>/<slug>/
 │   └── extractedData/<category>/<slug>/
@@ -84,16 +85,16 @@ Output is written to `data/extractedData/<category>/<slug>/records.jsonl`.
 
 ## Roadmap
 
-- **Phase 1** — Basic RAG pipeline: parse → chunk → embed → store → retrieve → grounded answer.
-- **Phase 2** — Evaluation: labeled Q/A set; retrieval metrics (hit rate, recall@k, MRR) and answer faithfulness.
-- **Phase 3** — Retrieval quality: hybrid keyword + vector search, cross-encoder re-ranking, query rewriting.
-- **Phase 4** — Multi-turn conversation and memory.
-- **Phase 5** — Agentic behavior (route between retrieval and direct answers).
-- **Phase 6** — Productionize: Docker, CI/CD, monitoring, deployment.
-- **Phase 7** — Scale corpus and infrastructure.
+- **Phase 1** - Basic RAG pipeline: parse → chunk → embed → store → retrieve → grounded answer.
+- **Phase 2** - Evaluation: labeled Q/A set; retrieval metrics (hit rate, recall@k, MRR) and answer faithfulness.
+- **Phase 3** - Retrieval quality: hybrid keyword + vector search, cross-encoder re-ranking, query rewriting.
+- **Phase 4** - Multi-turn conversation and memory.
+- **Phase 5** - Agentic behavior (route between retrieval and direct answers).
+- **Phase 6** - Productionize: Docker, CI/CD, monitoring, deployment.
+- **Phase 7** - Scale corpus and infrastructure.
 
 Subject to change.
 
 ## License
 
-© 2026 Akshat Surana. All rights.
+© 2026 Akshat Surana. All rights reserved.
