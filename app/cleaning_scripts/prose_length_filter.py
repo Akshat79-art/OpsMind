@@ -5,8 +5,7 @@ Drops records that are too thin to be useful (stubs, image-only sections, near-e
 ABSOLUTE_FLOOR = 50
 IQR_FACTOR = 1.5
 
-
-def quantile(values: list[int], q: float) -> float:
+def quantile_value(values: list[int], q: float) -> float:
     '''
     Returns the q-th quantile (0..1) of the values using linear interpolation between the two nearest ranks.
     '''
@@ -36,7 +35,7 @@ def compute_cutoff(lengths: list[int], floor: int = ABSOLUTE_FLOOR) -> float:
     return max(float(floor), lower_fence)
 
 
-def filter_short(records: list[dict]) -> list[dict]:
+def filter_short_records(records: list[dict]) -> list[dict]:
     '''
     Drops records whose cleaned text length is below the per-slug cutoff.
     Returns the records that are long enough to be useful.
