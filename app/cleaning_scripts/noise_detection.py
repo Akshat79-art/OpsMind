@@ -12,14 +12,16 @@ LOW_CONF_THRESHOLD = 0.4
 OFFSET_MIN_COVERAGE = 0.7
 SPACING_RATIO = 0.15
 REPEAT_THRESHOLD = 0.5
+LOCAL_HEADER_MIN_RUN = 3
 
 WS        = re.compile(r"\s+")      # whitespace runs
 DOT_LEADER = re.compile(r"\.{3,}")  # 3+ consecutive dots
 DIGITS    = re.compile(r"\d+")      # digit runs
 
 DEFAULT_PAGE_NUM_PATTERNS = [
-    re.compile(r"^\s*\d{1,4}\s*$"),
-    re.compile(r".*\s\d{1,4}\s*$"),
+    re.compile(r"^\s*\d{1,4}\s*$"),          # bare int
+    re.compile(r".*\s\d{1,4}\s*$"),           # title + trailing number
+    re.compile(r"^\s*\d{1,4}\s+[A-Za-z]"),    # leading number + title (outer-margin pages)
 ]
 
 @dataclass
@@ -71,6 +73,32 @@ def analyze(records, rules=None) -> NoiseProfile:
     print("Records processed")
     return profile
 
+def detect_local_headers(edges: list[tuple[list[str], list[str]]]) -> set[str]:
+    '''
+    Finds normalized first-lines that repeat across a run of consecutive
+    records (running headers that vary by chapter/section, so they never
+    cross the global REPEAT_THRESHOLD).
+    '''
+    keys: set[str] = set()
+    run_key, run_len = None, 0
+
+    def flush() -> None:
+        nonlocal run_key, run_len
+        if run_key is not None and run_len >= LOCAL_HEADER_MIN_RUN:
+            keys.add(run_key)
+        run_key, run_len = None, 0
+
+    for header, _ in edges:
+        key = noise_key(header[0]) if header else None
+        if key is not None and key == run_key:
+            run_len += 1
+        else:
+            flush()
+            run_key, run_len = key, 1
+    flush()
+    return keys
+
+
 def detect_repeated(edges: list[tuple[list[str], list[str]]]) -> tuple[set[str], set[str]]:
     '''
     detect_repeated finds boilerplate: the edge lines that occur across most pages (running headers, section footers). 
@@ -92,6 +120,7 @@ def detect_repeated(edges: list[tuple[list[str], list[str]]]) -> tuple[set[str],
         return (set(), set())
     
     header_keys = {k for k, c in header_count.items() if c / total > REPEAT_THRESHOLD}
+    header_keys |= detect_local_headers(edges)
     footer_keys = {k for k, c in footer_count.items() if c / total > REPEAT_THRESHOLD}
 
     return (header_keys, footer_keys)
@@ -139,15 +168,14 @@ def infer_offset(records: list[dict], edges: list[tuple[list[str], list[str]]]) 
     if coverage < OFFSET_MIN_COVERAGE:
         return (None, coverage)
 
-    # printed numbers should advance by 1 as pdf pages advance by 1
+    # printed numbers should advance in step with pdf pages (allowing gaps)
     numbered.sort(key=lambda pair: pair[0])
     steps = 0
     matches = 0
     for (page_a, printed_a), (page_b, printed_b) in zip(numbered, numbered[1:]):
-        if page_b - page_a == 1:
-            steps += 1
-            if printed_b - printed_a == 1:
-                matches += 1
+        steps += 1
+        if printed_b - printed_a == page_b - page_a:
+            matches += 1
     monotonic = matches / steps if steps else 0.0
     if monotonic < OFFSET_MIN_COVERAGE:
         return (None, coverage)
@@ -171,9 +199,12 @@ def page_number(lines: list[str], patterns: list[re.Pattern] | None = None) -> i
     '''
     for line in reversed(lines):
         if any(p.search(line) for p in (patterns or DEFAULT_PAGE_NUM_PATTERNS)):
-            match = re.search(r"\d+\s*$", line)
-            if match:
-                return int(match.group())
+            trailing = re.search(r"\d+\s*$", line)
+            if trailing:
+                return int(trailing.group())
+            leading = re.match(r"\s*(\d{1,4})\s+[A-Za-z]", line)
+            if leading:
+                return int(leading.group(1))
     return None
 
 def record_confidence(record: dict, header: list[str], footer: list[str], profile: NoiseProfile) -> float:
