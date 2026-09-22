@@ -28,8 +28,8 @@ def compute_cutoff(lengths: list[int], floor: int = ABSOLUTE_FLOOR) -> float:
     '''
     if not lengths:
         return float(floor)
-    q1 = quantile(lengths, 0.25)
-    q3 = quantile(lengths, 0.75)
+    q1 = quantile_value(lengths, 0.25)
+    q3 = quantile_value(lengths, 0.75)
     iqr = q3 - q1
     lower_fence = q1 - IQR_FACTOR * iqr
     return max(float(floor), lower_fence)
