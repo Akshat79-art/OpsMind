@@ -22,7 +22,7 @@ def is_line_noise(line: str, record: dict, profile: NoiseProfile, conf: float) -
     # 2. page-number line, by offset equality (only when offset trusted)
     page = record.get("page")
     if profile.offset is not None and isinstance(page, int) and conf >= LOW_CONF_THRESHOLD:
-        n = page_number([line])
+        n = page_number([line], profile.page_patterns)
         if n is not None and n == page - profile.offset:
             return True
 

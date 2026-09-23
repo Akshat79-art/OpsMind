@@ -18,16 +18,30 @@ WS        = re.compile(r"\s+")      # whitespace runs
 DOT_LEADER = re.compile(r"\.{3,}")  # 3+ consecutive dots
 DIGITS    = re.compile(r"\d+")      # digit runs
 
-DEFAULT_PAGE_NUM_PATTERNS = [
-    re.compile(r"^\s*\d{1,4}\s*$"),          # bare int
-    re.compile(r".*\s\d{1,4}\s*$"),           # title + trailing number
-    re.compile(r"^\s*\d{1,4}\s+[A-Za-z]"),    # leading number + title (outer-margin pages)
-]
+PAGE_NUM_PLACEHOLDERS = {
+    "{n}": r"\d{1,4}",
+    "{text}": r".+",
+}
+
+
+def compile_page_patterns(templates: list[str]) -> list[re.Pattern]:
+    '''
+    Compiles {n}/{text} page-number templates (from sourceRules) into
+    regexes that match a whole line, e.g. "{text} {n}" becomes
+    r"^\\s*.+\\s+\\d{1,4}\\s*$".
+    '''
+    compiled = []
+    for template in templates:
+        tokens = [PAGE_NUM_PLACEHOLDERS.get(token, re.escape(token)) for token in template.split()]
+        body = r"\s+".join(tokens)
+        compiled.append(re.compile(r"^\s*" + body + r"\s*$"))
+    return compiled
 
 @dataclass
 class NoiseProfile:
     header_keys: set[str]           # Normalized signatures of edge lines appearing on >50% of records.
     footer_keys: set[str]           # Used to match headers/footers across pages, tolerant of changing numbers.
+    page_patterns: list[re.Pattern] # Compiled page-number shapes (from sourceRules), shared by pass 1 and pass 2.
     offset: int | None              # Printed page = PDF page − offset
     offset_coverage: float          # Fraction of numbered records that support offset. Confidence in the offset.
     record_conf: list[float]        # How well the noise rules understood the page, not how good the content is.
@@ -47,15 +61,15 @@ def analyze(records, rules=None) -> NoiseProfile:
     # 2. Identify noise
     header_keys, footer_keys = detect_repeated(edges)
 
-    # 3. Infer offset
-    offset, coverage = infer_offset(records, edges)
+    # 3. Compile page-number patterns from source rules
+    patterns = compile_page_patterns(list(getattr(rules, "PAGE_PATTERNS", [])))
 
-    # 4. Patterns (default + optional source overrides)
-    patterns = DEFAULT_PAGE_NUM_PATTERNS + list(getattr(rules, "PAGE_PATTERNS", []))
+    # 4. Infer offset
+    offset, coverage = infer_offset(records, edges, patterns)
 
     # 5. Make profile per record
     profile = NoiseProfile(
-        header_keys=header_keys, footer_keys=footer_keys,
+        header_keys=header_keys, footer_keys=footer_keys, page_patterns=patterns,
         offset=offset, offset_coverage=coverage,
         record_conf=[], review_flags=[], notes=[], exclude=[]
     )
@@ -135,7 +149,7 @@ def get_header_footer(text: str, n: int = EDGE_LINES) -> tuple[list[str], list[s
     footer_candidates = split_text[-n:]
     return (header_candidates, footer_candidates)
 
-def infer_offset(records: list[dict], edges: list[tuple[list[str], list[str]]]) -> tuple[int|None, float]:
+def infer_offset(records: list[dict], edges: list[tuple[list[str], list[str]]], patterns: list[re.Pattern]) -> tuple[int|None, float]:
     '''
     For each record, n = inferred_page_number; d = page - n;
     take the mode as offset, coverage = count(mode)/count(numbered). 
@@ -149,9 +163,9 @@ def infer_offset(records: list[dict], edges: list[tuple[list[str], list[str]]]) 
         if not isinstance(page, int):
             continue
 
-        printed_page_num = page_number(footer, DEFAULT_PAGE_NUM_PATTERNS)
+        printed_page_num = page_number(footer, patterns)
         if printed_page_num is None:
-            printed_page_num = page_number(header, DEFAULT_PAGE_NUM_PATTERNS)
+            printed_page_num = page_number(header, patterns)
         if printed_page_num is None:
             continue
 
@@ -192,13 +206,13 @@ def noise_key(text:str) -> str:
     text = DIGITS.sub("#", text)          # digit -> #
     return text.strip(" .,:;-")           # trim edge punctuation
 
-def page_number(lines: list[str], patterns: list[re.Pattern] | None = None) -> int | None:
+def page_number(lines: list[str], patterns: list[re.Pattern]) -> int | None:
     '''
     Uses the page-number regexes to find the page number.
     Returns the printed page integer if `line` is a page-number line, else None.
     '''
     for line in reversed(lines):
-        if any(p.search(line) for p in (patterns or DEFAULT_PAGE_NUM_PATTERNS)):
+        if any(p.search(line) for p in patterns):
             trailing = re.search(r"\d+\s*$", line)
             if trailing:
                 return int(trailing.group())
@@ -222,9 +236,9 @@ def record_confidence(record: dict, header: list[str], footer: list[str], profil
     page = record.get("page")
     if profile.offset is not None and isinstance(page, int):
         checks += 1
-        n = page_number(footer)
+        n = page_number(footer, profile.page_patterns)
         if n is None:
-            n = page_number(header)
+            n = page_number(header, profile.page_patterns)
         if n == page - profile.offset:
             passed += 1
 
@@ -251,7 +265,7 @@ def review_flags(record: dict, header: list[str], footer: list[str], profile: No
         flags.append("low_conf")
 
     page = record.get("page")
-    n = page_number(footer) or page_number(header)
+    n = page_number(footer, profile.page_patterns) or page_number(header, profile.page_patterns)
 
     if isinstance(page, int) and n is None:
         flags.append("no_page_number")

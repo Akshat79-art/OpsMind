@@ -8,12 +8,23 @@ Run from app/cleaning_scripts.
 import json
 from pathlib import Path
 
+from app.cleaning_scripts.sourceRules import md_rules, pdf_rules
 from noise_detection import analyze
 from textNormalization import normalize_records
 from prose_length_filter import filter_short_records
 
 INPUT_ROOT = Path("../../data/extractedData")
 OUTPUT_ROOT = Path("../../data/processedData")
+
+
+def rules_for(records: list[dict]):
+    '''
+    Picks the source rules by record format: 
+    PDF rules when records carry a page number, otherwise markdown rules.
+    '''
+    if any(isinstance(record.get("page"), int) for record in records):
+        return pdf_rules
+    return md_rules
 
 
 def clean_data(input_root: Path = INPUT_ROOT, output_root: Path = OUTPUT_ROOT) -> None:
@@ -29,7 +40,7 @@ def clean_data(input_root: Path = INPUT_ROOT, output_root: Path = OUTPUT_ROOT) -
         with open(records_path, "r", encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
 
-        profile = analyze(records, None)
+        profile = analyze(records, rules_for(records))
         cleaned = normalize_records(records, profile)
 
         kept = [record for record, excluded in zip(cleaned, profile.exclude) if not excluded]
