@@ -8,7 +8,7 @@ Run from app/cleaning_scripts.
 import json
 from pathlib import Path
 
-from app.cleaning_scripts.sourceRules import md_rules, pdf_rules
+from sourceRules import md_rules, pdf_rules
 from noise_detection import analyze
 from textNormalization import normalize_records
 from prose_length_filter import filter_short_records
