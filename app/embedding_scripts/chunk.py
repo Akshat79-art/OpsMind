@@ -29,7 +29,8 @@ def chunk_text(text: str) -> list[str]:
     Splits text into overlapping windows of CHUNK_SIZE tokens.
     Returns the original text slices (token offsets preserve case and punctuation).
     '''
-    encoded = get_tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
+    tokenizer = get_tokenizer()
+    encoded = tokenizer(text, add_special_tokens=False, return_offsets_mapping=True)
     offsets = encoded["offset_mapping"]
     if not offsets:
         return []
@@ -84,7 +85,7 @@ def main() -> None:
         total_chunks += len(chunks)
         print(f"{category}/{slug}: records={len(records)} chunks={len(chunks)}")
 
-    print(f"\nDone. total chunks={total_chunks}")
+    print(f"\nDone. Total chunks = {total_chunks}")
 
 
 if __name__ == "__main__":
