@@ -6,7 +6,7 @@ A Retrieval-Augmented Generation (RAG) assistant for asking natural-language que
 
 OpsMind builds a retrieval pipeline over a curated corpus of open documentation. Documents are parsed into a uniform record format, chunked, embedded, and stored in a vector database. Questions are answered by retrieving the most relevant chunks and passing them to an LLM with a grounded prompt, so responses stay anchored to source material.
 
-The project is intentionally built in stages: from a minimal Q&A pipeline toward evaluation, re-ranking, multi-turn conversation, and containerized deployment: mirroring a progression in both AI engineering fundamentals and DevOps practice.
+The project is intentionally built in stages: from a minimal Q&A pipeline toward evaluation, re-ranking, multi-turn conversation, and containerized deployment. It's to showcase progression in both AI engineering fundamentals and DevOps practice.
 
 ## Status
 
@@ -15,18 +15,18 @@ Early development. Phase 1 (basic RAG pipeline) is in progress.
 Completed so far:
 - Corpus acquisition and a raw-data layout partitioned by topic.
 - PDF extraction: raw PDFs are converted into per-page JSONL records.
-
-Planned next:
 - Markdown adapter (one record per heading).
 - Cleaning pass (strip running headers/footers and page numbers, normalize ligatures, rejoin hyphenation).
 - Chunking, embedding, and vector storage.
+
+Planned next:
 - Retrieval + grounded generation via the CLI.
 
 ## Pipeline
 
 ```
-rawData/  ──▶  extractedData/  ──▶  processedData/  ──▶  embeddings  ──▶  retrieval  ──▶  LLM answer
- (source)      (uniform records)     (cleaned text)      (vectors)        (top-k)        (cited)
+rawData/  ──▶  extractedData/  ──▶  processedData/  ──▶  chunks_data  ──▶ embeddings  ──▶  Chroma  ──▶  retrieval  ──▶  LLM answer
+ (source)      (uniform records)     (cleaned text)    (text broken down)    (vectors)      (storage)       (top-k)          (cited)
 ```
 
 Every stage writes to its own directory so any stage can be re-run without repeating the previous ones.
@@ -37,10 +37,11 @@ Every stage writes to its own directory so any stage can be re-run without repea
 |---|---|
 | Language | Python 3.13 |
 | Embeddings | `sentence-transformers` (`BAAI/bge-small-en-v1.5`) - Hosted Local |
+| Chunking   | transformers (Autotokenizer)
 | Vector store | Chroma |
 | Generation | OpenRouter, free-tier model |
 | PDF parsing | `pypdf` |
-| Config | `pydantic-settings` |
+| Config | .env |
 | Retrieval/generation | Hand-written pipeline (no framework) |
 
 ## Repository layout
@@ -48,12 +49,28 @@ Every stage writes to its own directory so any stage can be re-run without repea
 ```
 OpsMind/
 ├── app/
-│   └── dataScripts/
-│       |── pdfScripts.py        # raw PDFs -> extractedData/<category>/<slug>/records.jsonl
-│       └── mdScripts.py
-├── data/                        # not committed (see .gitignore)
+│   ├── dataExtractionScripts/     # raw sources -> extractedData records
+│   │   ├── pdfScripts.py
+│   │   ├── mdScripts.py
+│   │   └── ccnaScripts.py
+│   ├── cleaning_scripts/          # extractedData -> processedData
+│   │   ├── noise_detection.py
+│   │   ├── textNormalization.py
+│   │   ├── prose_length_filter.py
+│   │   ├── pipeline.py
+│   │   └── sourceRules/
+│   │       ├── pdf_rules.py
+│   │       └── md_rules.py
+│   └── embedding_scripts/         # processedData -> chunks -> Chroma
+│       ├── chunk.py
+│       ├── embed.py
+│       └── chroma_store.py
+├── data/                          # not committed (see .gitignore)
 │   ├── rawData/<category>/<slug>/
-│   └── extractedData/<category>/<slug>/
+│   ├── extractedData/<category>/<slug>/records.jsonl
+│   ├── processedData/<category>/<slug>/records.jsonl
+│   ├── chunks_data/<category>/<slug>/chunks.jsonl
+│   └── chroma/                    # persistent vector store
 ├── requirements.txt
 └── README.md
 ```
@@ -74,11 +91,11 @@ python -m pip install -r requirements.txt
 
 ### Usage
 
-The scripts use paths relative to `app/dataScripts/`, so run them from that directory:
+The scripts use paths relative to `app/dataExtractionScripts/`, so run them from that directory:
 
 ```powershell
-cd app\dataScripts
-python pdfScripts.py
+cd app\dataExtractionScripts
+python <fileName>.py
 ```
 
 Output is written to `data/extractedData/<category>/<slug>/records.jsonl`.
