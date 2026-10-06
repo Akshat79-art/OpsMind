@@ -13,7 +13,6 @@ Used by ask.py; requires OPENROUTER_API_KEY and OPENROUTER_MODEL in .env.
 
 import os
 
-import json
 import requests
 import time
 
@@ -40,10 +39,10 @@ def build_messages(question: str, hits: list[dict]) -> tuple[list[dict], dict]:
 
         ref = f"[{index}] (Source: {label})\n{hit["text"]}"
         ref_list.append(ref)
-        sources[str[index]] = label
+        sources[str(index)] = label
 
     context = "\n\n".join(ref_list)
-    prompt = f'''User has asked a question that you need to answer. You are provided the following context: {context}.
+    prompt = f'''User has asked a question that you need to answer. You are provided with the context.
     Answer using only the context given. Cite sources as [n]. If the context doesn't cover the question, say you don't have enough information.
     Do not create answers from sources out of context.'''
     
@@ -62,8 +61,6 @@ def call_llm(messages: list[dict]) -> str:
     '''
 
     apiKey = os.getenv("OPENROUTER_API_KEY")
-    model = os.getenv("OPENROUTER_MODEL")
-
     backoff_time = 1.0      # 1s, 2s, 4s
     max_attempts = 3
 
@@ -73,12 +70,11 @@ def call_llm(messages: list[dict]) -> str:
         "Content-Type": "application/json",
     }
     free_models = [
+        "dots-studio/dots-3-note-preview:free",
         "meta-llama/llama-3.3-70b-instruct:free",
-        "nvidia/nemotron-3-ultra:free",
-        "nvidia/nemotron-3-super:free",
-        "qwen/qwen-2.5-72b-instruct:free",
+        "thinkingmachines/inkling:free",
         ]
-    payload = {"model": free_models, "messages": messages}
+    payload = {"model": free_models[0], "messages": messages}
 
     last_error = None
 
@@ -89,11 +85,35 @@ def call_llm(messages: list[dict]) -> str:
             last_error = exc
         else:
             sc = response.status_code
+
             if sc == 200:
-                return response.json()["choices"][0]["message"]["content"]
+                data = response.json()
+
+                # If LLM responds with an error
+                if 'error' in data:
+                    error = data['error']
+                    err_msg = error['message']
+                    print("LLM returned with following error:")
+                    print(error)
+                    sc = error['code']
+                    if sc == 429 or (sc > 499 and sc < 600):
+                        last_error = f"HTTP {sc}: {err_msg[:200]}"
+                    else:
+                        raise RuntimeError(f"{err_msg}")
+
+                # If LLM responds with an answer
+                else:
+                    # If LLM has choices in the json
+                    if 'choices' in data:
+                        return data['choices'][0]['message']['content']
+                    else:
+                        raise RuntimeError(f"Unexpected response: {data}")
+            
             if sc in (429, 500, 502, 503, 504):
                 last_error = f"HTTP {sc}: {response.text[:200]}"
             else:
+                print("Following error occured:")
+                print(response.text[:300])
                 response.raise_for_status()
 
         if attempt < max_attempts - 1:
