@@ -1,17 +1,17 @@
 import sys
 
 from retrieve import retrieve
-from generation import build_messages, call_llm
+from generation import augment_prompt, generate_answer
 
 def answer(question: str) -> str:
 
     '''Retrieves context, generates an answer, prints it with sources.'''
 
     hits = retrieve(question, 5)
-    messages, sources = build_messages(question, hits)
+    messages, sources = augment_prompt(question, hits)
 
     try:
-        answer = call_llm(messages)
+        answer = generate_answer(messages)
         print(answer)
         print("\nSources:")
         for n, label in sources.items():

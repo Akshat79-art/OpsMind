@@ -39,13 +39,11 @@ def load_chunk_batches(root: Path = CHUNKS_ROOT, size: int = BATCH_SIZE) -> Iter
 def get_collection(rebuild: bool) -> chromadb.Collection:
 
     chroma_client = chromadb.PersistentClient(path = CHROMA_PATH)
+    existing = {c if isinstance(c, str) else c.name for c in chroma_client.list_collections()}
 
-    if rebuild:
-        try:
-            chroma_client.delete_collection(name=COLLECTION_NAME)
-            print(f"Collection '{COLLECTION_NAME}' deleted successfully.")
-        except chromadb.errors.NotFoundError:
-            print(f"Collection '{COLLECTION_NAME}' does not exist. Skipping deletion.")
+    if rebuild and COLLECTION_NAME in existing:
+        chroma_client.delete_collection(name=COLLECTION_NAME)
+        print(f"Collection '{COLLECTION_NAME}' deleted successfully.")
 
     collection = chroma_client.get_or_create_collection(name = COLLECTION_NAME, metadata = {"hnsw:space": "cosine"})
     return collection

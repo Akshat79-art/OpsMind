@@ -67,6 +67,7 @@ def clean_text(text: str, record: dict, profile: NoiseProfile, conf: float) -> s
     lines = strip_images(lines)
     joined = rejoin_hyphenation(lines)
     normalized = unicodedata.normalize("NFKC", joined)
+    normalized = "".join(c for c in normalized if c in "\n\t" or unicodedata.category(c) not in ("Cc", "Cf"))
     normalized = re.sub(r"\n{3,}", "\n\n", normalized)
     normalized = re.sub(r"[ \t]+\n", "\n", normalized)
     return normalized.strip()

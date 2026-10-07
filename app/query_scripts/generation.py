@@ -21,10 +21,11 @@ from pathlib import Path
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-def build_messages(question: str, hits: list[dict]) -> tuple[list[dict], dict]:
+def augment_prompt(question: str, hits: list[dict]) -> tuple[list[dict], dict]:
     '''
+    The augmentation part.
     Sets up the prompt for the llm by using the hits provided by retrieve.
-    Does so by processing them into a list of messages that is passed to llm.
+    This is done by processing them into a list of messages that is passed to the llm.
     '''
 
     ref_list = []
@@ -54,7 +55,7 @@ def build_messages(question: str, hits: list[dict]) -> tuple[list[dict], dict]:
     return messages, sources
 
 
-def call_llm(messages: list[dict]) -> str:
+def generate_answer(messages: list[dict]) -> str:
     '''
     Sends the chat messages to OpenRouter and returns the assistant's text.
     Retries with exponential backoff on rate limits (429) and server errors.
